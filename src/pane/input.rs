@@ -100,6 +100,30 @@ pub(super) fn ghostty_mouse_position_for_terminal(
     }
 }
 
+pub(super) fn ghostty_mouse_event_from_extended_button(
+    button: crate::protocol::ClientMouseButton,
+    down: bool,
+    column: u16,
+    row: u16,
+    modifiers: crossterm::event::KeyModifiers,
+) -> Option<crate::ghostty::MouseEvent> {
+    let button = match button {
+        crate::protocol::ClientMouseButton::Button8 => crate::ghostty::MOUSE_BUTTON_EIGHT,
+        crate::protocol::ClientMouseButton::Button9 => crate::ghostty::MOUSE_BUTTON_NINE,
+        _ => return None,
+    };
+    let mut event = crate::ghostty::MouseEvent::new().ok()?;
+    event.set_action(if down {
+        crate::ghostty::MOUSE_ACTION_PRESS
+    } else {
+        crate::ghostty::MOUSE_ACTION_RELEASE
+    });
+    event.set_button(button);
+    event.set_mods(ghostty_mods_from_key_modifiers(modifiers));
+    event.set_position(column as f32, row as f32);
+    Some(event)
+}
+
 pub(super) fn ghostty_mouse_event_from_button_kind(
     kind: crossterm::event::MouseEventKind,
     column: u16,

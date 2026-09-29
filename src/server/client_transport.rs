@@ -585,6 +585,7 @@ fn pane_input_event_limit(events: &[ClientPaneInputEvent]) -> InputEventLimit {
             } => usize::from((*lines).max(1)),
             ClientPaneInputEvent::TextCommit(_)
             | ClientPaneInputEvent::Mouse { .. }
+            | ClientPaneInputEvent::ExtendedMouse { .. }
             | ClientPaneInputEvent::Paste(_) => 1,
         });
         match event {
@@ -603,7 +604,7 @@ fn pane_input_event_limit(events: &[ClientPaneInputEvent]) -> InputEventLimit {
             ClientPaneInputEvent::TextCommit(text) => {
                 input_bytes = input_bytes.saturating_add(text.len());
             }
-            ClientPaneInputEvent::Mouse { .. } => {}
+            ClientPaneInputEvent::Mouse { .. } | ClientPaneInputEvent::ExtendedMouse { .. } => {}
             ClientPaneInputEvent::Paste(text) => {
                 paste_bytes = paste_bytes.saturating_add(text.len());
             }

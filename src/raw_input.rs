@@ -60,6 +60,15 @@ pub enum RawInputEvent {
     Text(TextCommit),
     Paste(String),
     Mouse(MouseEvent),
+    /// Боковые кнопки 8/9 не вмещаются в `crossterm::MouseButton`, но SGR
+    /// mouse protocol умеет передавать их в TUI внутри pane.
+    ExtendedMouse {
+        button: u8,
+        down: bool,
+        column: u16,
+        row: u16,
+        modifiers: KeyModifiers,
+    },
     OuterFocusGained,
     OuterFocusLost,
     HostDefaultColor {
@@ -875,6 +884,9 @@ fn extract_one_event(buffer: &[u8]) -> Option<(RawInputEvent, usize)> {
             ));
         }
 
+        if let Some(event) = parse_extended_sgr_mouse(seq) {
+            return Some((event, seq_len));
+        }
         if let Some(mouse) = parse_sgr_mouse(seq) {
             return Some((RawInputEvent::Mouse(mouse), seq_len));
         }
@@ -1348,6 +1360,41 @@ fn parse_sgr_mouse(sequence: &str) -> Option<MouseEvent> {
     })
 }
 
+/// Extra mouse buttons use the high bits of SGR's `Cb`; crossterm's public
+/// enum has no representation for them, so retain their semantic data here.
+fn parse_extended_sgr_mouse(sequence: &str) -> Option<RawInputEvent> {
+    let body = sequence.strip_prefix("\x1b[<")?;
+    let final_char = body.chars().last()?;
+    if final_char != 'M' && final_char != 'm' {
+        return None;
+    }
+    let mut parts = body[..body.len() - 1].split(';');
+    let cb = parts.next()?.parse::<u8>().ok()?;
+    let column = parts.next()?.parse::<u16>().ok()?.checked_sub(1)?;
+    let row = parts.next()?.parse::<u16>().ok()?.checked_sub(1)?;
+    let button = (cb & 0b0000_0011) | ((cb & 0b1100_0000) >> 4);
+    if !matches!(button, 8 | 9) || cb & 0b0010_0000 != 0 {
+        return None;
+    }
+    let mut modifiers = KeyModifiers::empty();
+    if cb & 0b0000_0100 != 0 {
+        modifiers |= KeyModifiers::SHIFT;
+    }
+    if cb & 0b0000_1000 != 0 {
+        modifiers |= KeyModifiers::ALT;
+    }
+    if cb & 0b0001_0000 != 0 {
+        modifiers |= KeyModifiers::CONTROL;
+    }
+    Some(RawInputEvent::ExtendedMouse {
+        button,
+        down: final_char == 'M',
+        column,
+        row,
+        modifiers,
+    })
+}
+
 fn parse_mouse_cb(cb: u8) -> Option<(MouseEventKind, KeyModifiers)> {
     let button_number = (cb & 0b0000_0011) | ((cb & 0b1100_0000) >> 4);
     let dragging = cb & 0b0010_0000 == 0b0010_0000;
@@ -1526,6 +1573,35 @@ mod tests {
             KeyCode::Char('x'),
             KeyModifiers::empty(),
         );
+    }
+
+    #[test]
+    fn preserves_extended_sgr_mouse_buttons() {
+        let (
+            RawInputEvent::ExtendedMouse {
+                button,
+                down,
+                column,
+                row,
+                modifiers,
+            },
+            _,
+        ) = extract_one_event(b"\x1b[<128;20;10M").unwrap()
+        else {
+            panic!("expected extended mouse down");
+        };
+        assert_eq!(button, 8);
+        assert!(down);
+        assert_eq!((column, row), (19, 9));
+        assert_eq!(modifiers, KeyModifiers::empty());
+
+        let (RawInputEvent::ExtendedMouse { button, down, .. }, _) =
+            extract_one_event(b"\x1b[<129;20;10m").unwrap()
+        else {
+            panic!("expected extended mouse release");
+        };
+        assert_eq!(button, 9);
+        assert!(!down);
     }
 
     #[test]

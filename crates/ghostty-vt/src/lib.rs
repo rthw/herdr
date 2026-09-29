@@ -174,6 +174,10 @@ pub const MOUSE_BUTTON_RIGHT: ffi::GhosttyMouseButton =
     ffi::GhosttyMouseButton_GHOSTTY_MOUSE_BUTTON_RIGHT;
 pub const MOUSE_BUTTON_MIDDLE: ffi::GhosttyMouseButton =
     ffi::GhosttyMouseButton_GHOSTTY_MOUSE_BUTTON_MIDDLE;
+pub const MOUSE_BUTTON_EIGHT: ffi::GhosttyMouseButton =
+    ffi::GhosttyMouseButton_GHOSTTY_MOUSE_BUTTON_EIGHT;
+pub const MOUSE_BUTTON_NINE: ffi::GhosttyMouseButton =
+    ffi::GhosttyMouseButton_GHOSTTY_MOUSE_BUTTON_NINE;
 pub const MOUSE_BUTTON_WHEEL_UP: ffi::GhosttyMouseButton =
     ffi::GhosttyMouseButton_GHOSTTY_MOUSE_BUTTON_FOUR;
 pub const MOUSE_BUTTON_WHEEL_DOWN: ffi::GhosttyMouseButton =

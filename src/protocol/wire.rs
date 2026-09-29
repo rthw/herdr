@@ -88,6 +88,10 @@ pub enum ClientMouseButton {
     Left,
     Right,
     Middle,
+    /// X1 / Back in SGR mouse protocol (button number 8).
+    Button8,
+    /// X2 / Forward in SGR mouse protocol (button number 9).
+    Button9,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -177,6 +181,14 @@ pub enum ClientPaneInputEvent {
         geometry: Option<ClientMouseGeometry>,
         modifiers: u8,
         lines: u16,
+    },
+    /// Extra SGR mouse buttons, which crossterm cannot represent.
+    ExtendedMouse {
+        button: ClientMouseButton,
+        down: bool,
+        position: ClientMousePosition,
+        geometry: Option<ClientMouseGeometry>,
+        modifiers: u8,
     },
     Paste(String),
 }
@@ -276,6 +288,9 @@ impl ClientMouseButton {
             Self::Left => crossterm::event::MouseButton::Left,
             Self::Right => crossterm::event::MouseButton::Right,
             Self::Middle => crossterm::event::MouseButton::Middle,
+            // This conversion is deliberately not used for extended buttons:
+            // callers must use `ClientPaneInputEvent::ExtendedMouse`.
+            Self::Button8 | Self::Button9 => crossterm::event::MouseButton::Left,
         }
     }
 }
@@ -389,6 +404,29 @@ impl ClientPaneInputEvent {
                     row,
                     modifiers: crossterm::event::KeyModifiers::from_bits_truncate(*modifiers),
                 })
+            }
+            Self::ExtendedMouse {
+                button,
+                down,
+                position,
+                modifiers,
+                ..
+            } => {
+                let (column, row) = match position {
+                    ClientMousePosition::Cell { column, row }
+                    | ClientMousePosition::Pixels { column, row, .. } => (*column, *row),
+                };
+                crate::raw_input::RawInputEvent::ExtendedMouse {
+                    button: match button {
+                        ClientMouseButton::Button8 => 8,
+                        ClientMouseButton::Button9 => 9,
+                        _ => unreachable!("extended mouse event requires an extended button"),
+                    },
+                    down: *down,
+                    column,
+                    row,
+                    modifiers: crossterm::event::KeyModifiers::from_bits_truncate(*modifiers),
+                }
             }
             Self::Paste(text) => crate::raw_input::RawInputEvent::Paste(text.clone()),
         }

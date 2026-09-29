@@ -220,6 +220,37 @@ fn apply_client_terminal_input_events(
     host_page_keys: bool,
 ) -> Result<(), String> {
     for event in events {
+        if let ClientPaneInputEvent::ExtendedMouse {
+            button,
+            down,
+            position,
+            modifiers,
+            ..
+        } = event
+        {
+            let position = match position {
+                crate::protocol::ClientMousePosition::Cell { column, row }
+                | crate::protocol::ClientMousePosition::Pixels { column, row, .. } => {
+                    crate::input::mouse::Position::Cell {
+                        column: *column,
+                        row: *row,
+                    }
+                }
+            };
+            let Some(bytes) = runtime.encode_extended_mouse_button(
+                *button,
+                *down,
+                position,
+                KeyModifiers::from_bits_truncate(*modifiers),
+            ) else {
+                continue;
+            };
+            runtime.scroll_reset();
+            runtime
+                .try_send_bytes(Bytes::from(bytes))
+                .map_err(|err| format!("targeted pane extended mouse input failed: {err}"))?;
+            continue;
+        }
         if let ClientPaneInputEvent::Mouse {
             kind,
             position,
@@ -331,6 +362,7 @@ fn apply_client_terminal_input_events(
                     .map_err(|err| format!("targeted pane paste failed: {err}"))?;
             }
             crate::raw_input::RawInputEvent::Mouse(_)
+            | crate::raw_input::RawInputEvent::ExtendedMouse { .. }
             | crate::raw_input::RawInputEvent::OuterFocusGained
             | crate::raw_input::RawInputEvent::OuterFocusLost
             | crate::raw_input::RawInputEvent::HostDefaultColor { .. }

@@ -239,6 +239,13 @@ impl ClientShellState {
                     }
                 }
                 RawInputEvent::Mouse(mouse) => self.handle_mouse(mouse, &mut outcome),
+                RawInputEvent::ExtendedMouse {
+                    button,
+                    down,
+                    column,
+                    row,
+                    modifiers,
+                } => self.handle_extended_mouse(button, down, column, row, modifiers, &mut outcome),
                 RawInputEvent::OuterFocusGained => {
                     self.outer_focused = Some(true);
                     outcome.query_host_appearance = true;

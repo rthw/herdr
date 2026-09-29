@@ -356,6 +356,7 @@ impl ClientConnection {
                     self.shell_held_inputs
                         .remove(&ClientShellPressId::Mouse(*button));
                 }
+                ClientPaneInputEvent::ExtendedMouse { .. } => {}
                 ClientPaneInputEvent::Key {
                     kind: ClientKeyKind::Press | ClientKeyKind::Repeat,
                     ..

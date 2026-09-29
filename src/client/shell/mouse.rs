@@ -2359,6 +2359,71 @@ impl ClientShellState {
         }
     }
 
+    /// Пробрасывает боковые кнопки SGR (8/9) напрямую в TUI активной pane.
+    /// Herdr не назначает им собственных действий, поэтому они никогда не
+    /// конфликтуют с выбором, drag'ом рамки и копированием текста.
+    pub(super) fn handle_extended_mouse(
+        &mut self,
+        button: u8,
+        down: bool,
+        column: u16,
+        row: u16,
+        modifiers: crossterm::event::KeyModifiers,
+        outcome: &mut ClientShellInput,
+    ) {
+        if self.overlay.is_some() || self.mode != ClientShellMode::Terminal {
+            return;
+        }
+        let point = (column, row);
+        let Some(hit) = self
+            .hits
+            .panes
+            .iter()
+            .find(|hit| super::contains(hit.inner_rect, point) && hit.mouse_reporting)
+            .cloned()
+        else {
+            return;
+        };
+        let button = match button {
+            8 => crate::protocol::ClientMouseButton::Button8,
+            9 => crate::protocol::ClientMouseButton::Button9,
+            _ => return,
+        };
+        let position = self.pane_mouse_position(
+            &hit,
+            MouseEvent {
+                kind: MouseEventKind::Moved,
+                column,
+                row,
+                modifiers,
+            },
+        );
+        let geometry = matches!(position, ClientMousePosition::Pixels { .. }).then_some(
+            crate::protocol::ClientMouseGeometry {
+                cols: hit.inner_rect.width,
+                rows: hit.inner_rect.height,
+                width_px: hit.pixel_width,
+                height_px: hit.pixel_height,
+            },
+        );
+        let target = if hit.popup {
+            ClientInputTarget::Popup(hit.pane_id)
+        } else {
+            ClientInputTarget::Pane(hit.pane_id)
+        };
+        push_target_event(
+            target,
+            ClientPaneInputEvent::ExtendedMouse {
+                button,
+                down,
+                position,
+                geometry,
+                modifiers: modifiers.bits(),
+            },
+            outcome,
+        );
+    }
+
     pub(super) fn push_pane_mouse_event(
         &self,
         hit: &PaneHit,
