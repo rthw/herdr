@@ -182,7 +182,10 @@ pub enum ClientPaneInputEvent {
         modifiers: u8,
         lines: u16,
     },
+    Paste(String),
     /// Extra SGR mouse buttons, which crossterm cannot represent.
+    /// Must stay after `Paste`: variants are encoded by index, and inserting before existing
+    /// ones breaks paste against stock servers (remote machines run upstream Herdr).
     ExtendedMouse {
         button: ClientMouseButton,
         down: bool,
@@ -190,7 +193,6 @@ pub enum ClientPaneInputEvent {
         geometry: Option<ClientMouseGeometry>,
         modifiers: u8,
     },
-    Paste(String),
 }
 
 #[cfg(any(windows, test))]
